@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listly — Voice Shopping Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF6ED;
+    --paper-edge:#EFE7D6;
+    --ink:#2B2620;
+    --ink-soft:#6b6255;
+    --produce:#4C7A54;
+    --produce-bg:#E7EFE6;
+    --dairy:#4A6FA5;
+    --dairy-bg:#E7ECF5;
+    --bakery:#C98A3A;
+    --bakery-bg:#F6ECDA;
+    --snacks:#8B5A8C;
+    --snacks-bg:#F1E7F1;
+    --meat:#B5533C;
+    --meat-bg:#F6E6E0;
+    --bev:#3E8E8A;
+    --bev-bg:#E2F0EE;
+    --other:#8a8272;
+    --other-bg:#EFEAE0;
+    --mic-idle:#2B2620;
+    --mic-live:#C1443B;
+    --shadow: 0 10px 30px rgba(43,38,32,0.12);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 20% 10%, rgba(255,255,255,0.5), transparent 40%),
+      linear-gradient(180deg, #EDE3CE 0%, #DED0B3 100%);
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    padding:28px 14px 60px;
+  }
+  .app{
+    width:100%;
+    max-width:430px;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:14px;
+    padding:0 4px;
+  }
+  .brand h1{
+    font-family:'Caveat', cursive;
+    font-size:2.6rem;
+    font-weight:700;
+    margin:0;
+    color:var(--ink);
+    line-height:1;
+  }
+  .brand span{
+    font-size:0.75rem;
+    color:var(--ink-soft);
+    font-weight:500;
+  }
+  select#langSelect{
+    font-family:'Inter',sans-serif;
+    font-size:0.75rem;
+    border:1px solid rgba(43,38,32,0.2);
+    background:rgba(255,255,255,0.6);
+    border-radius:20px;
+    padding:5px 10px;
+    color:var(--ink);
+  }
+
+  .receipt{
+    background:var(--paper);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    position:relative;
+    padding:22px 20px 18px;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(43,38,32,0.045) 28px);
+  }
+  .receipt::before, .receipt::after{
+    content:"";
+    position:absolute;
+    left:0; right:0;
+    height:10px;
+    background:
+      radial-gradient(circle at 8px 0, transparent 6px, var(--paper) 6.5px) repeat-x;
+    background-size:16px 10px;
+  }
+  .receipt::before{ top:-9px; transform:rotate(180deg);}
+  .receipt::after{ bottom:-9px; }
+
+  .mic-row{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    padding:6px 0 18px;
+    border-bottom:1px dashed rgba(43,38,32,0.25);
+    margin-bottom:14px;
+  }
+  .mic-btn{
+    width:74px;height:74px;
+    border-radius:50%;
+    border:none;
+    background:var(--mic-idle);
+    color:var(--paper);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:transform .15s ease, background .2s ease;
+    position:relative;
+  }
+  .mic-btn:active{ transform:scale(0.94); }
+  .mic-btn.listening{ background:var(--mic-live); }
+  .mic-btn.listening::after{
+    content:"";
+    position:absolute;
+    inset:-8px;
+    border-radius:50%;
+    border:2px solid var(--mic-live);
+    animation:pulse 1.4s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{ transform:scale(0.9); opacity:0.9;}
+    100%{ transform:scale(1.5); opacity:0;}
+  }
+  .mic-btn svg{ width:28px;height:28px; }
+  .mic-status{
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    min-height:16px;
+    text-align:center;
+  }
+  .transcript{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.82rem;
+    color:var(--ink);
+    background:rgba(43,38,32,0.05);
+    border-radius:8px;
+    padding:8px 10px;
+    min-height:16px;
+    max-width:100%;
+    word-break:break-word;
+    display:none;
+  }
+  .transcript.show{ display:block; }
+  .type-fallback{
+    display:flex;
+    gap:6px;
+    width:100%;
+    margin-top:4px;
+  }
+  .type-fallback input{
+    flex:1;
+    font-family:'Inter',sans-serif;
+    font-size:0.82rem;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid rgba(43,38,32,0.2);
+    background:#fff;
+  }
+  .type-fallback button{
+    font-family:'Inter',sans-serif;
+    font-size:0.78rem;
+    font-weight:600;
+    border:none;
+    background:var(--ink);
+    color:var(--paper);
+    padding:0 14px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+
+  .section-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.68rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:14px 0 8px;
+  }
+
+  .suggestions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:6px;
+  }
+  .chip{
+    font-family:'Inter',sans-serif;
+    font-size:0.74rem;
+    font-weight:500;
+    border:1px dashed rgba(43,38,32,0.3);
+    background:transparent;
+    color:var(--ink);
+    padding:6px 10px;
+    border-radius:16px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .chip:hover{ background:rgba(43,38,32,0.06); }
+  .chip.sub{ border-color:var(--bev); color:var(--bev); }
+
+  .list-empty{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    text-align:center;
+    padding:18px 0;
+  }
+  .category-group{ margin-bottom:10px; }
+  .category-title{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'Inter',sans-serif;
+    font-size:0.72rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin-bottom:4px;
+  }
+  .dot{ width:8px;height:8px;border-radius:50%; }
+  .item-line{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.9rem;
+    padding:5px 6px;
+    border-radius:6px;
+    animation:printIn .25s ease;
+  }
+  .item-line:hover{ background:rgba(43,38,32,0.05); }
+  @keyframes printIn{
+    from{ opacity:0; transform:translateY(-4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .item-left{ display:flex; gap:8px; align-items:baseline; }
+  .item-qty{ color:var(--ink-soft); font-size:0.78rem; min-width:20px;}
+  .item-name{ }
+  .item-name.out{ text-decoration:line-through; color:var(--ink-soft); }
+  .item-right{ display:flex; align-items:center; gap:8px; }
+  .item-remove{
+    border:none; background:none; cursor:pointer;
+    color:var(--ink-soft); font-size:0.9rem; line-height:1;
+    padding:2px 6px;
+  }
+  .item-remove:hover{ color:var(--meat); }
+
+  .toast{
+    position:fixed;
+    bottom:22px; left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    font-size:0.82rem;
+    padding:10px 16px;
+    border-radius:20px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    max-width:80%;
+    text-align:center;
+    z-index:20;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .search-panel{
+    margin-top:14px;
+    border-top:1px dashed rgba(43,38,32,0.25);
+    padding-top:12px;
+  }
+  .search-result{
+    display:flex;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+    padding:4px 2px;
+  }
+  .search-result span:last-child{ color:var(--ink-soft); }
+
+  .loader{
+    display:inline-block;
+    width:12px;height:12px;
+    border:2px solid rgba(43,38,32,0.25);
+    border-top-color:var(--ink);
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+    vertical-align:middle;
+    margin-right:6px;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  footer.hint{
+    text-align:center;
+    font-size:0.72rem;
+    color:var(--ink-soft);
+    margin-top:14px;
+    line-height:1.5;
+    padding:0 10px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand">
+    <h1>Listly</h1>
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+      <span>voice shopping list</span>
+      <select id="langSelect">
+        <option value="en-US">English</option>
+        <option value="es-ES">Español</option>
+        <option value="hi-IN">हिन्दी</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="receipt">
+    <div class="mic-row">
+      <button class="mic-btn" id="micBtn" aria-label="Start listening">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      </button>
+      <div class="mic-status" id="micStatus">Tap to speak — try "add 2 bottles of water"</div>
+      <div class="transcript" id="transcript"></div>
+      <div class="type-fallback" id="typeFallback" style="display:none;">
+        <input type="text" id="typeInput" placeholder="Type a command instead…">
+        <button id="typeSend">Send</button>
+      </div>
+    </div>
+
+    <div id="suggestionsBlock">
+      <div class="section-label">Smart suggestions</div>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+
+    <div class="section-label">Your list</div>
+    <div id="listArea"></div>
+
+    <div class="search-panel" id="searchPanel" style="display:none;">
+      <div class="section-label">Search results</div>
+      <div id="searchResults"></div>
+    </div>
+  </div>
+
+  <footer class="hint">
+    Try: "add milk" · "I need 3 apples" · "remove bread" · "find toothpaste under $5"
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- Data ---------------- */
+const CATEGORY_RULES = [
+  { cat: 'Dairy', color: 'var(--dairy)', bg: 'var(--dairy-bg)', keywords: ['milk','cheese','yogurt','butter','cream','paneer'] },
+  { cat: 'Produce', color: 'var(--produce)', bg: 'var(--produce-bg)', keywords: ['apple','banana','orange','tomato','onion','potato','spinach','lettuce','carrot','peach','watermelon','corn','grape','mango'] },
+  { cat: 'Bakery', color: 'var(--bakery)', bg: 'var(--bakery-bg)', keywords: ['bread','bagel','bun','croissant','cake'] },
+  { cat: 'Snacks', color: 'var(--snacks)', bg: 'var(--snacks-bg)', keywords: ['chips','cookie','cookies','popcorn','crackers','chocolate'] },
+  { cat: 'Meat & Seafood', color: 'var(--meat)', bg: 'var(--meat-bg)', keywords: ['chicken','beef','fish','shrimp','pork','egg','eggs'] },
+  { cat: 'Beverages', color: 'var(--bev)', bg: 'var(--bev-bg)', keywords: ['water','soda','juice','coffee','tea'] },
+];
+function categorize(name){
+  const n = name.toLowerCase();
+  for (const rule of CATEGORY_RULES){
+    if (rule.keywords.some(k => n.includes(k))) return rule;
+  }
+  return { cat: 'Other', color: 'var(--other)', bg: 'var(--other-bg)' };
+}
+
+const SUBSTITUTES = {
+  milk: ['almond milk', 'oat milk'],
+  eggs: ['egg substitute', 'tofu'],
+  sugar: ['honey', 'stevia'],
+  bread: ['gluten-free bread'],
+};
+const OUT_OF_STOCK = ['milk', 'eggs']; // simulated
+
+const SEASONAL_AUG = ['corn', 'watermelon', 'peaches', 'tomatoes'];
+const HISTORY_SUGGESTIONS = ['bread', 'coffee']; // simulated "running low"
+
+const MOCK_CATALOG = [
+  { name: 'toothpaste', brand: 'Colgate', price: 3.49 },
+  { name: 'toothpaste', brand: 'Sensodyne', price: 6.99 },
+  { name: 'toothpaste', brand: 'Store Brand', price: 2.29 },
+  { name: 'organic apples', brand: 'Fresh Farms', price: 4.99 },
+  { name: 'apples', brand: 'Fresh Farms', price: 3.49 },
+  { name: 'coffee', brand: 'Blue Bottle', price: 12.99 },
+  { name: 'coffee', brand: 'Store Brand', price: 5.49 },
+];
+
+// Basic multilingual keyword mapping so recognized foreign phrases still parse
+const LANG_KEYWORDS = {
+  'es-ES': { add: ['añade','agrega','necesito','quiero','compra'], remove: ['quita','elimina','borra'], find: ['busca','encuentra'] },
+  'hi-IN': { add: ['जोड़ो','चाहिए','खरीदना'], remove: ['हटाओ','निकालो'], find: ['खोजो','ढूंढो'] },
+};
+
+/* ---------------- State ---------------- */
+let shoppingList = []; // {id, name, qty, cat}
+let idCounter = 1;
+
+/* ---------------- Rendering ---------------- */
+function render(){
+  const area = document.getElementById('listArea');
+  area.innerHTML = '';
+  if (shoppingList.length === 0){
+    area.innerHTML = '<div class="list-empty">Your list is empty. Try saying "add milk".</div>';
+  } else {
+    const groups = {};
+    shoppingList.forEach(item => {
+      if (!groups[item.cat.cat]) groups[item.cat.cat] = { meta: item.cat, items: [] };
+      groups[item.cat.cat].items.push(item);
+    });
+    Object.values(groups).forEach(g => {
+      const groupEl = document.createElement('div');
+      groupEl.className = 'category-group';
+      groupEl.innerHTML = `<div class="category-title"><span class="dot" style="background:${g.meta.color}"></span>${g.meta.cat}</div>`;
+      g.items.forEach(item => {
+        const line = document.createElement('div');
+        line.className = 'item-line';
+        const isOut = OUT_OF_STOCK.includes(item.name.toLowerCase());
+        line.innerHTML = `
+          <div class="item-left">
+            <span class="item-qty">${item.qty}×</span>
+            <span class="item-name ${isOut ? 'out' : ''}">${item.name}</span>
+          </div>
+          <div class="item-right">
+            ${isOut ? '<span style="font-size:0.68rem;color:var(--meat);">out of stock</span>' : ''}
+            <button class="item-remove" data-id="${item.id}" aria-label="Remove ${item.name}">✕</button>
+          </div>`;
+        groupEl.appendChild(line);
+      });
+      area.appendChild(groupEl);
+    });
+  }
+  area.querySelectorAll('.item-remove').forEach(btn => {
+    btn.onclick = () => {
+      const id = Number(btn.dataset.id);
+      const removed = shoppingList.find(i => i.id === id);
+      shoppingList = shoppingList.filter(i => i.id !== id);
+      render();
+      if (removed) showToast(`Removed ${removed.name}`);
+    };
+  });
+  renderSuggestions();
+}
+
+function renderSuggestions(){
+  const box = document.getElementById('suggestions');
+  box.innerHTML = '';
+  const suggestions = [];
+
+  HISTORY_SUGGESTIONS.forEach(item => {
+    if (!shoppingList.some(i => i.name.toLowerCase() === item)){
+      suggestions.push({ label: `Running low on ${item}?`, action: () => addItem(item, 1) });
+    }
+  });
+  SEASONAL_AUG.forEach(item => {
+    if (!shoppingList.some(i => i.name.toLowerCase() === item)){
+      suggestions.push({ label: `In season: ${item}`, action: () => addItem(item, 1) });
+    }
+  });
+  shoppingList.forEach(item => {
+    const key = item.name.toLowerCase();
+    if (OUT_OF_STOCK.includes(key) && SUBSTITUTES[key]){
+      SUBSTITUTES[key].forEach(sub => {
+        suggestions.push({ label: `Swap for ${sub}?`, sub: true, action: () => {
+          shoppingList = shoppingList.filter(i => i.id !== item.id);
+          addItem(sub, item.qty);
+        }});
+      });
+    }
+  });
+
+  suggestions.slice(0, 5).forEach(s => {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (s.sub ? ' sub' : '');
+    chip.textContent = s.label;
+    chip.onclick = s.action;
+    box.appendChild(chip);
+  });
+  if (suggestions.length === 0){
+    box.innerHTML = '<span style="font-size:0.75rem;color:var(--ink-soft);">No suggestions right now.</span>';
+  }
+}
+
+function showToast(msg){
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+/* ---------------- List actions ---------------- */
+function addItem(name, qty){
+  name = name.trim().toLowerCase();
+  if (!name) return;
+  const existing = shoppingList.find(i => i.name.toLowerCase() === name);
+  if (existing){
+    existing.qty += qty;
+  } else {
+    shoppingList.push({ id: idCounter++, name, qty, cat: categorize(name) });
+  }
+  render();
+  showToast(`Added ${qty > 1 ? qty + ' ' : ''}${name}`);
+}
+function removeItem(name){
+  name = name.trim().toLowerCase();
+  const before = shoppingList.length;
+  shoppingList = shoppingList.filter(i => i.name.toLowerCase() !== name);
+  render();
+  if (shoppingList.length < before) showToast(`Removed ${name}`);
+  else showToast(`Couldn't find "${name}" on your list`);
+}
+
+/* ---------------- NLP parsing ---------------- */
+const NUM_WORDS = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10 };
+
+function extractQty(text){
+  const digitMatch = text.match(/\b(\d+)\b/);
+  if (digitMatch) return parseInt(digitMatch[1], 10);
+  for (const w in NUM_WORDS){
+    if (new RegExp(`\\b${w}\\b`, 'i').test(text)) return NUM_WORDS[w];
+  }
+  return 1;
+}
+
+function cleanItemName(text){
+  return text
+    .replace(/\b(add|need|buy|want|get|remove|delete|take off|to my list|from my list|find|search for|look for|of|please)\b/gi, ' ')
+    .replace(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, ' ')
+    .replace(/\bunder\s*\$?\d+(\.\d+)?\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchesAny(text, words){
+  return words.some(w => text.toLowerCase().includes(w));
+}
+
+function parseCommand(raw){
+  const text = raw.trim();
+  const lower = text.toLowerCase();
+  const lang = document.getElementById('langSelect').value;
+  const extra = LANG_KEYWORDS[lang] || { add: [], remove: [], find: [] };
+
+  const removeWords = ['remove', 'delete', 'take off', ...extra.remove];
+  const findWords = ['find', 'search for', 'look for', ...extra.find];
+  const addWords = ['add', 'need', 'buy', 'want', 'get', ...extra.add];
+
+  if (matchesAny(lower, findWords)){
+    const priceMatch = lower.match(/under\s*\$?(\d+(\.\d+)?)/);
+    const maxPrice = priceMatch ? parseFloat(priceMatch[1]) : null;
+    const item = cleanItemName(text);
+    runSearch(item, maxPrice);
+    return;
+  }
+  if (matchesAny(lower, removeWords)){
+    const item = cleanItemName(text);
+    removeItem(item);
+    return;
+  }
+  if (matchesAny(lower, addWords) || lower.length > 0){
+    const qty = extractQty(lower);
+    const item = cleanItemName(text);
+    if (item) addItem(item, qty);
+    else showToast("Didn't catch an item name — try again");
+    return;
+  }
+}
+
+function runSearch(query, maxPrice){
+  document.getElementById('searchPanel').style.display = 'block';
+  const results = MOCK_CATALOG.filter(p => p.name.includes(query.toLowerCase()) &&
+    (maxPrice === null || p.price <= maxPrice));
+  const box = document.getElementById('searchResults');
+  box.innerHTML = '';
+  if (results.length === 0){
+    box.innerHTML = '<div style="font-size:0.8rem;color:var(--ink-soft);">No matches found.</div>';
+    return;
+  }
+  results.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'search-result';
+    row.innerHTML = `<span>${r.name} — ${r.brand}</span><span>$${r.price.toFixed(2)}</span>`;
+    row.style.cursor = 'pointer';
+    row.onclick = () => addItem(r.name, 1);
+    box.appendChild(row);
+  });
+}
+
+/* ---------------- Voice recognition ---------------- */
+const micBtn = document.getElementById('micBtn');
+const micStatus = document.getElementById('micStatus');
+const transcriptEl = document.getElementById('transcript');
+let recognition = null;
+let listening = false;
+
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function processTranscript(text){
+  transcriptEl.classList.add('show');
+  transcriptEl.innerHTML = `<span class="loader"></span> "${text}"`;
+  setTimeout(() => {
+    parseCommand(text);
+    transcriptEl.textContent = `"${text}"`;
+  }, 350);
+}
+
+if (SpeechRecognitionAPI){
+  recognition = new SpeechRecognitionAPI();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    listening = true;
+    micBtn.classList.add('listening');
+    micStatus.textContent = 'Listening…';
+  };
+  recognition.onend = () => {
+    listening = false;
+    micBtn.classList.remove('listening');
+    micStatus.textContent = 'Tap to speak — try "add 2 bottles of water"';
+  };
+  recognition.onerror = (e) => {
+    listening = false;
+    micBtn.classList.remove('listening');
+    micStatus.textContent = `Mic error (${e.error}). Try typing instead.`;
+    document.getElementById('typeFallback').style.display = 'flex';
+  };
+  recognition.onresult = (event) => {
+    let interim = '';
+    let final = '';
+    for (let i = event.resultIndex; i < event.results.length; i++){
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (interim){
+      transcriptEl.classList.add('show');
+      transcriptEl.textContent = interim;
+    }
+    if (final){
+      processTranscript(final);
+    }
+  };
+
+  micBtn.onclick = () => {
+    if (listening){ recognition.stop(); return; }
+    recognition.lang = document.getElementById('langSelect').value;
+    try { recognition.start(); }
+    catch(err){ console.error(err); }
+  };
+} else {
+  micStatus.textContent = 'Voice recognition not supported in this browser — type a command below.';
+  document.getElementById('typeFallback').style.display = 'flex';
+  micBtn.disabled = true;
+  micBtn.style.opacity = 0.4;
+}
+
+document.getElementById('typeSend').onclick = () => {
+  const input = document.getElementById('typeInput');
+  if (input.value.trim()){
+    processTranscript(input.value.trim());
+    input.value = '';
+  }
+};
+document.getElementById('typeInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('typeSend').click();
+});
+
+/* ---------------- Init ---------------- */
+render();
+</script>
+</body>
+</html>
